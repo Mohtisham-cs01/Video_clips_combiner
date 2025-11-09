@@ -14,6 +14,7 @@ A simple desktop application for combining video clips.
 
 - Python 3
 - `moviepy` library
+- `ffmpeg` cli tool
 
 ## Installation
 
@@ -21,7 +22,7 @@ A simple desktop application for combining video clips.
 2.  Install the `moviepy` library using pip:
 
     ```bash
-    pip install moviepy
+    pip install moviepy tkinter
     ```
 
 ## How to Run
