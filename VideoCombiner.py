@@ -3,7 +3,8 @@ from tkinter import filedialog, Listbox, END, messagebox
 import os
 
 try:
-    from moviepy import VideoFileClip, concatenate_videoclips
+    # from moviepy import VideoFileClip, concatenate_videoclips , CompositeVideoClip , ColorClip 
+    from moviepy import *
 except ImportError:
     messagebox.showerror("Error", "MoviePy is not installed. Please install it using: pip install moviepy")
     exit()
@@ -55,6 +56,19 @@ class VideoCombiner(tk.Tk):
         self.btn_remove = tk.Button(self, text="Remove Selected", command=self.remove_selected_clips)
         self.btn_remove.pack(pady=5)
 
+        # --- Transition Options ---
+        self.frame_options = tk.Frame(self)
+        self.frame_options.pack(pady=5)
+
+        self.var_transitions = tk.BooleanVar(value=False)
+        self.chk_transitions = tk.Checkbutton(self.frame_options, text="Enable Crossfade Transitions", variable=self.var_transitions)
+        self.chk_transitions.pack(side=tk.LEFT, padx=5)
+
+        tk.Label(self.frame_options, text="Duration (s):").pack(side=tk.LEFT, padx=5)
+        self.var_duration = tk.DoubleVar(value=1.0)
+        self.spin_duration = tk.Spinbox(self.frame_options, from_=0.1, to=5.0, increment=0.1, textvariable=self.var_duration, width=5)
+        self.spin_duration.pack(side=tk.LEFT)
+
         self.listbox = DraggableListbox(self, selectmode=tk.EXTENDED)
         self.listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
@@ -91,16 +105,100 @@ class VideoCombiner(tk.Tk):
         try:
             print("Combining videos...")
             clips = [VideoFileClip(path) for path in self.clip_paths]
-            final_clip = concatenate_videoclips(clips, method="compose")
-            final_clip.write_videofile(output_path)
+            
+            if not clips:
+                return
+
+            # Determine target resolution (max width/height)
+            max_width = max(clip.w for clip in clips)
+            max_height = max(clip.h for clip in clips)
+            target_size = (max_width, max_height)
+
+            # Resize clips to target size
+            resized_clips = []
+            for clip in clips:
+                if clip.w != max_width or clip.h != max_height:
+                    # Resize while maintaining aspect ratio and padding
+                    # This is a simplified resize, for professional results we might want more complex logic
+                    # But for speed/simplicity, we'll just resize to fit or fill.
+                    # Let's use a safe approach: resize to fit within box, then pad.
+                    
+                    # Calculate scaling factor
+                    scale_factor = min(max_width / clip.w, max_height / clip.h)
+                    new_w = int(clip.w * scale_factor)
+                    new_h = int(clip.h * scale_factor)
+                    
+                    # Resize
+                    clip_resized = clip.resized(new_size=(new_w, new_h))
+                    
+                    # Pad if necessary
+                    if new_w < max_width or new_h < max_height:
+                        clip_final = CompositeVideoClip([
+                            ColorClip(size=target_size, color=(0,0,0), duration=clip.duration),
+                            clip_resized.with_position("center")
+                        ], size=target_size)
+                    else:
+                        clip_final = clip_resized
+                    
+                    resized_clips.append(clip_final)
+                else:
+                    resized_clips.append(clip)
+            
+            clips = resized_clips # Update clips list with resized versions
+
+            if self.var_transitions.get() and len(clips) > 1:
+                # Apply Crossfade Transitions
+                transition_duration = self.var_duration.get()
+                
+                # We need to overlap clips. 
+                # Clip 1 plays, then Clip 2 starts 'transition_duration' before Clip 1 ends.
+                
+                final_clips = []
+                # The first clip is just itself, but we need to handle the start time for subsequent clips
+                
+                # Using CompositeVideoClip for transitions is more flexible but can be memory intensive.
+                # A more standard way in moviepy for simple crossfade is `concatenate_videoclips(..., method="compose", padding=-duration)` 
+                # but explicit crossfadein/out is often smoother.
+                
+                # Let's use the list of clips with crossfadein applied to all but the first
+                clips_with_transition = [clips[0]]
+                for i in range(1, len(clips)):
+                    # Apply crossfade in to the current clip
+                    # And overlap it with the previous one
+                    clip = clips[i].with_effects([vfx.CrossFadeIn(transition_duration)])
+                    clips_with_transition.append(clip)
+                
+                # Concatenate with padding (negative padding creates overlap)
+                final_clip = concatenate_videoclips(clips_with_transition, method="compose", padding=-transition_duration)
+                
+            else:
+                # Simple Concatenation
+                final_clip = concatenate_videoclips(clips, method="compose")
+
+            # Write output with optimization
+            # preset='ultrafast' significantly speeds up encoding
+            # threads=4 ensures multi-core usage
+            final_clip.write_videofile(
+                output_path, 
+                codec='libx264', 
+                audio_codec='aac', 
+                preset='ultrafast', 
+                threads=4,
+                fps=24 # Enforce a standard fps if not set, or use clips[0].fps
+            )
             
             for clip in clips:
-                clip.close()
+                try:
+                    clip.close()
+                except:
+                    pass
 
             messagebox.showinfo("Success", f"Videos combined successfully and saved to:\n{output_path}")
             print("Done.")
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             messagebox.showerror("Error", f"An error occurred during video combination:\n{e}")
 
     def remove_selected_clips(self):
