@@ -53,8 +53,14 @@ class VideoCombiner(tk.Tk):
         self.btn_add = tk.Button(self, text="Add Clips", command=self.add_clips)
         self.btn_add.pack(pady=10)
 
-        self.btn_remove = tk.Button(self, text="Remove Selected", command=self.remove_selected_clips)
-        self.btn_remove.pack(pady=5)
+        self.frame_buttons = tk.Frame(self)
+        self.frame_buttons.pack(pady=5)
+
+        self.btn_remove = tk.Button(self.frame_buttons, text="Remove Selected", command=self.remove_selected_clips)
+        self.btn_remove.pack(side=tk.LEFT, padx=5)
+
+        self.btn_remove_all = tk.Button(self.frame_buttons, text="Remove All", command=self.remove_all_clips)
+        self.btn_remove_all.pack(side=tk.LEFT, padx=5)
 
         # --- Transition Options ---
         self.frame_options = tk.Frame(self)
@@ -211,6 +217,11 @@ class VideoCombiner(tk.Tk):
         for index in sorted(selected_indices, reverse=True):
             self.listbox.delete(index)
             del self.clip_paths[index]
+
+    def remove_all_clips(self):
+        if messagebox.askyesno("Confirm", "Are you sure you want to remove all clips?"):
+            self.listbox.delete(0, END)
+            self.clip_paths.clear()
 
     def on_closing(self):
         self.destroy()

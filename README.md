@@ -8,6 +8,7 @@ A simple desktop application for combining video clips.
 - **Sort by Title:** Clips are automatically sorted by title upon adding.
 - **Drag-and-Drop Reordering:** Easily change the order of the clips by dragging and dropping them in the list.
 - **Remove Clips:** Select one or more clips and remove them from the list.
+- **Remove All:** Remove all clips from the list at once.
 - **Combine:** Merge the clips in the specified order into a single video file.
 
 ## Requirements
